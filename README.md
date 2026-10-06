@@ -124,13 +124,27 @@ python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_
 
 `False` is acceptable: YOLO falls back to the CPU with a printed warning and trains roughly 10× slower.
 
-### 3. Run the notebooks in order
+### 3. Train everything and open the app: one notebook
 
 ```powershell
 jupyter lab
 ```
 
-Open `notebooks/` and run each notebook top to bottom:
+Open **`notebooks/run_all.ipynb`**:
+
+| Cell | When to run it | What it does |
+|---|---|---|
+| **Step 1 · Train everything** | Once (first time) | Runs notebooks 00 → 09 in order with progress, saving each notebook's outputs |
+| **Step 2 · Launch the app** | Every demo, on its own | Opens the Streamlit app on the saved results in seconds; no training |
+| **Step 3 · Stop the app** | Optional | Shuts the app down |
+
+First time: *Run → Run All Cells*. On demo day: run **only the Step 2 cell**. Training happens once; results live in `data/`, `models/` and `results/` on that laptop, so present from the same machine and keep those folders.
+
+From a terminal, the same two steps are `python -m mia.pipeline` (with `src` on `PYTHONPATH`) and `streamlit run app/Home.py`.
+
+<details>
+<summary>What run_all executes (you can also run these notebooks one by one)</summary>
+
 
 | # | Notebook | What it does | Rough estimate |
 |---|---|---|---|
@@ -145,19 +159,20 @@ Open `notebooks/` and run each notebook top to bottom:
 | 08 | `08_analysis_and_figures` | Spearman ρ, F1–F7, results CSV, fills this README | ~2 min |
 | 09 | `09_disclosure_report` | Renders the disclosure report | seconds |
 
+</details>
+
 Every notebook is **idempotent**: it checks `results/mia.sqlite` and skips models and attack runs that already exist, so an interrupted run resumes where it stopped.
 
 <details>
 <summary>Run everything headless (PowerShell)</summary>
 
 ```powershell
-Get-ChildItem notebooks\*.ipynb | Sort-Object Name | ForEach-Object {
-    jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=-1 $_.FullName
-}
+$env:PYTHONPATH = "src"
+python -m mia.pipeline
 ```
 </details>
 
-### 4. Launch the demo
+### 4. Launch the demo (without the notebook)
 
 ```powershell
 streamlit run app/Home.py
@@ -225,8 +240,10 @@ p51-mia-audit/
 │   ├── metrics.py                # ROC/AUC, bootstrap CI, TPR@FPR, lift, Spearman + permutation test
 │   ├── db.py                     # SQLite schema and helpers
 │   ├── plots.py                  # figures F1–F7
+│   ├── pipeline.py               # executes notebooks 00–09 in order (used by run_all.ipynb)
 │   └── report.py                 # disclosure report renderer (Jinja2)
 ├── notebooks/00 … 09             # the experiments, run in numeric order
+├── notebooks/run_all.ipynb       # one-click: train everything (once), then launch the app
 ├── app/                          # Streamlit app: Home + 5 pages
 ├── templates/disclosure_report.md.j2
 ├── tests/                        # features, metrics, attacks, database
