@@ -91,7 +91,8 @@ bars.update_layout(height=300, yaxis_title="Model probability", yaxis_range=[0, 
 mid.plotly_chart(bars)
 
 with right:
-    st.metric("Attack score", f"{score:.4f}", f"threshold at 1% FPR: {threshold:.4f}", delta_color="off")
+    st.metric("Attack score", f"{score:.4f}")
+    st.caption(f"Threshold at 1% FPR: {threshold:.4f} (flag when score ≥ threshold)")
     (st.error if flagged else st.success)("Flagged as MEMBER" if flagged else "Not flagged")
     if truth is None:
         st.info("Ground truth unknown: this image is outside the audit set.")

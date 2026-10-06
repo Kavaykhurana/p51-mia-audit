@@ -116,19 +116,16 @@ def f5_roc_curves(curves: dict):
 
 def f6_exposed_members(images: np.ndarray, labels: np.ndarray, panels: dict):
     """panels: {model_id: DataFrame(sample_idx, is_member, score)} for two models -> 4x8 grid of top-16 members."""
-    fig, axes = plt.subplots(4, 8, figsize=(12, 7))
-    for p, (mid, scores) in enumerate(panels.items()):
+    fig = plt.figure(figsize=(12, 8), layout="constrained")
+    fig.suptitle("F6  Training images an attacker identifies with the highest confidence")
+    for sub, (mid, scores) in zip(fig.subfigures(len(panels), 1, hspace=0.04), panels.items()):
+        sub.suptitle(f"{mid}: 16 most-exposed members (A1 score)", fontweight="bold", fontsize=10)
         top = scores[scores["is_member"] == 1].nlargest(16, "score")
-        for j, (_, r) in enumerate(top.iterrows()):
-            ax = axes[2 * p + j // 8, j % 8]
-            ax.imshow(images[int(r["sample_idx"])][..., ::-1], interpolation="nearest")
-            ax.set_title(f"{CLASS_NAMES[labels[int(r['sample_idx'])]]}\n{r['score']:.2f}", fontsize=7)
-        axes[2 * p, 0].text(-0.15, 1.35, f"{mid}: 16 most-exposed members (A1 score)", transform=axes[2 * p, 0].transAxes,
-                            fontsize=9, fontweight="bold")
-    for ax in axes.ravel():
-        ax.axis("off")
-    fig.suptitle("F6  Training images an attacker identifies with the highest confidence", y=1.0)
-    fig.tight_layout()
+        for ax, (_, r) in zip(sub.subplots(2, 8).ravel(), top.iterrows()):
+            i = int(r["sample_idx"])
+            ax.imshow(images[i][..., ::-1], interpolation="nearest")
+            ax.set_title(f"{CLASS_NAMES[labels[i]]}\n{r['score']:.2f}", fontsize=7)
+            ax.axis("off")
     return fig
 
 

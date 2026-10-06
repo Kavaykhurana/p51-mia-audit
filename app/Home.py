@@ -59,10 +59,10 @@ hi, lo = pts.loc[pts["auc"].idxmax()], pts.loc[pts["auc"].idxmin()]
 rank = {"Low": 0, "Moderate": 1, "High": 2, "Critical": 3}
 worst = max(rows, key=lambda r: rank.get(r["Severity"], -1)) if rows else None
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("Highest attack AUC", f"{hi['auc']:.3f}", hi["config_id"], delta_color="off")
-c2.metric("Lowest attack AUC", f"{lo['auc']:.3f}", lo["config_id"], delta_color="off")
-c3.metric("Spearman ρ, AUC vs gap", f"{rho:.2f}", f"p = {p:.4f}", delta_color="off")
-c4.metric("Worst severity", worst["Severity"] if worst else "—", worst["Config"] if worst else None, delta_color="off")
+c1.metric(f"Highest attack AUC · {hi['config_id']}", f"{hi['auc']:.3f}", help=f"{hi['model_id']}, {hi['attack']}")
+c2.metric(f"Lowest attack AUC · {lo['config_id']}", f"{lo['auc']:.3f}", help=f"{lo['model_id']}, {lo['attack']}")
+c3.metric(f"Spearman ρ, AUC vs gap · p = {p:.4f}", f"{rho:.2f}", help=f"{len(pts)} target models, permutation test")
+c4.metric(f"Worst severity · {worst['Config']}" if worst else "Worst severity", worst["Severity"] if worst else "—")
 
 st.subheader("The seven audited configurations")
 if rows:
