@@ -1,0 +1,93 @@
+# Responsible-Disclosure Report: Membership Leakage in CIFAR-10 Image Classifiers
+
+**Report date:** {{ today }} · **Scope:** seven image classifiers (C1–C7) built in project P51 · **Status:** Day 0 (initial report)
+
+## 1. Executive summary
+
+The most exposed model is **{{ worst.config_id }}** (`{{ worst.model_id }}`). Its best attack ({{ worst.attack }}) reaches ROC-AUC **{{ "%.3f"|format(worst.auc) }}** and identifies **{{ "%.1f"|format(worst.tpr01 * 100) }}%** of training images while wrongly flagging only 0.1% of unseen images (lift {{ "%.1f"|format(worst.lift) }}×), which rates **{{ worst.severity }}**.
+The least exposed model is **{{ safest.config_id }}** (AUC {{ "%.3f"|format(safest.auc) }}, severity {{ safest.severity }}).
+Risk statement: anyone who can query {{ worst.config_id }} for its probability vector can tell, for a large share of its training images, that those exact images were used to train it.
+
+## 2. Affected assets
+
+| Config | Model audited | Description | Family | Test accuracy | Train–test gap | Parameters |
+|---|---|---|---|---:|---:|---:|
+{% for a in assets %}
+| {{ a.config_id }} | `{{ a.model_id }}` | {{ a.description }} | {{ a.family }} | {{ "%.1f"|format(a.test_acc * 100) }}% | {{ "%.1f"|format(a.gap * 100) }} pp | {{ "{:,}".format(a.n_params) }} |
+{% endfor %}
+
+## 3. Threat model
+
+- **Access:** black-box queries returning the full 10-class probability vector.
+- **Data:** the attacker holds images from the same distribution as the training data, disjoint from the target's training set ({{ classical_k }} shadow models per classical recipe, {{ yolo_k }} per YOLO recipe).
+- **Knowledge:** the training recipe (features, model family, hyper-parameters) is known; the target's weights and training set are not.
+- **Goal:** decide for one specific image whether it was in the training set. Audit set: {{ n_audit }} images, {{ n_members }} of them members (50% prior).
+
+### Severity rubric
+
+λ = TPR / FPR at FPR = 0.1% (how many times better than guessing the attacker is at a very low false-alarm rate).
+
+| Severity | Lift λ |
+|---|---|
+| Low | λ < {{ bounds.moderate|int }} |
+| Moderate | {{ bounds.moderate|int }} ≤ λ < {{ bounds.high|int }} |
+| High | {{ bounds.high|int }} ≤ λ < {{ bounds.critical|int }} |
+| Critical | λ ≥ {{ bounds.critical|int }} |
+
+## 4. Findings
+
+| Config | Best attack | AUC [95% CI] | TPR @ 1% FPR | TPR @ 0.1% FPR | Lift λ | Severity |
+|---|---|---|---:|---:|---:|---|
+{% for f in findings %}
+| {{ f.config_id }} | {{ f.attack }} | {{ "%.3f"|format(f.auc) }} [{{ "%.3f"|format(f.lo) }}, {{ "%.3f"|format(f.hi) }}] | {{ "%.2f"|format(f.tpr1 * 100) }}% | {{ "%.2f"|format(f.tpr01 * 100) }}% | {{ "%.1f"|format(f.lift) }} | **{{ f.severity }}** |
+{% endfor %}
+
+## 5. Reproduction
+
+```bash
+python -m venv .venv            # Windows: py -3.11 -m venv .venv
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+jupyter lab                     # run notebooks/00 ... 09 in numeric order
+streamlit run app/Home.py
+```
+
+Notebook order: `00_setup_and_split` → `01_preprocessing_and_features` → `02_train_classical_targets` → `03_train_yolo_targets` → `04_train_shadows` → `05_attacks` → `06_sweep_early_stopping` → `07_sweep_label_smoothing` → `08_analysis_and_figures` → `09_disclosure_report`. Every number in this report is read from `results/mia.sqlite`.
+
+## 6. Mitigations
+
+### 6.1 Early stopping
+
+| Base | Most accurate point | Most private point | Accuracy cost |
+|---|---|---|---:|
+{% for e in early %}
+| {{ e.base }} | epoch {{ e.acc_x|int }}: acc {{ "%.1f"|format(e.acc_acc * 100) }}%, AUC {{ "%.3f"|format(e.acc_auc) }} | epoch {{ e.priv_x|int }}: acc {{ "%.1f"|format(e.priv_acc * 100) }}%, AUC {{ "%.3f"|format(e.priv_auc) }} | {{ "%.1f"|format(e.cost_pp) }} pp |
+{% endfor %}
+
+### 6.2 Label smoothing
+
+{% for s in smoothing %}
+**{{ s.base }}:** label smoothing **{{ s.verdict }}** leakage. AUC at ε = 0 is {{ "%.3f"|format(s.auc0) }}; the mean AUC over ε > 0 is {{ "%.3f"|format(s.auc_ls_mean) }}. The most private setting (ε = {{ "%.2f"|format(s.priv_x) }}, AUC {{ "%.3f"|format(s.priv_auc) }}) costs {{ "%.1f"|format(s.cost_pp) }} pp of test accuracy relative to the most accurate setting (ε = {{ "%.2f"|format(s.acc_x) }}).
+
+| ε | Test accuracy | Best attack AUC | TPR @ 0.1% FPR |
+|---:|---:|---:|---:|
+{% for p in s.points %}
+| {{ "%.2f"|format(p.x_value) }} | {{ "%.1f"|format(p.test_acc * 100) }}% | {{ "%.3f"|format(p.auc) }} | {{ "%.2f"|format(p.tpr_at_01pct_fpr * 100) }}% |
+{% endfor %}
+
+{% endfor %}
+## 7. Residual risk and limitations
+
+- The attacks used here (shadow-model Fisher LDA, loss, confidence, modified entropy, K-means, Fuzzy C-means) are **lower bounds** on leakage; stronger per-example attacks (e.g. likelihood-ratio attacks) would likely find more.
+- CIFAR-10 is a public dataset, so membership itself is not sensitive here; the audit demonstrates the risk for private image collections (faces, medical images) trained the same way.
+- Images are 32×32; results may differ for higher-resolution data.
+- One data split (seed 0) is used; seed-to-seed variation is reported only for the softmax configurations.
+
+## 8. Remediation timeline
+
+| Day | Milestone |
+|---|---|
+| 0 | This report delivered to the model owners |
+| 30 | Mitigations deployed: early stopping at the most private checkpoint, regularised recipes (C5/C7 style), output limited to the top-1 label where possible |
+| 60 | Re-audit with the same notebooks and attack suite |
+| 90 | Closure, or escalation if any model remains High or Critical |

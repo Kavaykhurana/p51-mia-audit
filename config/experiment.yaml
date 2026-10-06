@@ -1,0 +1,16 @@
+split: {seed: 0, per_class: {member: 1000, nonmember: 1000, val: 500, shadow: 3500}}
+shadows: {classical_k: 16, yolo_k: 4, per_class_in: 1000, per_class_out: 1000, per_class_val: 200}
+seeds: {softmax: [0, 1, 2], yolo: [0]}
+configs:
+  C1: {family: nn, description: "Memoriser: standardised features, soft 1-NN"}
+  C2: {family: softmax, pca: null, l2: 0.0, epochs: 200, label_smoothing: 0.0, aug_copies: 0, checkpoint_epochs: [1, 2, 5, 10, 20, 50, 100, 200], description: "Raw 426-d linear discriminant, no regularisation"}
+  C3: {family: softmax, pca: 64, l2: 0.001, epochs: 200, label_smoothing: 0.0, aug_copies: 0, checkpoint_epochs: [200], description: "PCA-64 linear discriminant with L2"}
+  C4: {family: softmax, pca: 64, l2: 0.001, epochs: 200, label_smoothing: 0.0, aug_copies: 2, checkpoint_epochs: [200], description: "C3 plus two affine-augmented copies per training image"}
+  C5: {family: lda, pca: 64, description: "PCA-64 Fisher LDA classifier, shrinkage auto"}
+  C6: {family: yolo, epochs: 100, dropout: 0.0, patience: 100, fliplr: 0.0, scale: 0.0, erasing: 0.0, auto_augment: null, hsv_h: 0.0, hsv_s: 0.0, hsv_v: 0.0, checkpoint_epochs: [5, 10, 20, 40, 60, 80, 100], description: "YOLO26n-cls from scratch, no augmentation"}
+  C7: {family: yolo, epochs: 100, dropout: 0.2, patience: 15, fliplr: 0.5, scale: 0.5, erasing: 0.4, auto_augment: randaugment, hsv_h: 0.015, hsv_s: 0.7, hsv_v: 0.4, checkpoint_epochs: [], description: "YOLO26n-cls from scratch, augmentation, dropout, early stopping"}
+sweeps:
+  early_stopping: {C2: [1, 2, 5, 10, 20, 50, 100, 200], C6: [5, 10, 20, 40, 60, 80, 100]}
+  label_smoothing: {bases: [C2, C3], epsilons: [0.0, 0.05, 0.1, 0.2, 0.3, 0.5]}
+metrics: {bootstrap: 1000, bootstrap_seed: 7, permutations: 10000, fpr_points: [0.01, 0.001]}
+severity_lift_bounds: {moderate: 2, high: 10, critical: 50}
